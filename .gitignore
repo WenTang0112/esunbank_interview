@@ -1,0 +1,20 @@
+# Maven/Java build outputs
+**/target/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE settings
+.idea/
+*.iml
+
+# VS Code workspace settings (keep if team needs them)
+.vscode/
+
+# Java crash logs
+hs_err_pid*
+replay_pid*
