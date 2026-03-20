@@ -124,8 +124,11 @@ BEGIN
         br.InventoryId,
         i.ISBN,
         b.Name AS BookName,
-        br.BorrowingTime,
-        br.ReturnTime
+        CONVERT(VARCHAR(19), DATEADD(HOUR, 8, br.BorrowingTime), 120) AS BorrowingTime,
+        CASE
+            WHEN br.ReturnTime IS NULL THEN NULL
+            ELSE CONVERT(VARCHAR(19), DATEADD(HOUR, 8, br.ReturnTime), 120)
+        END AS ReturnTime
     FROM dbo.BorrowingRecords br
     INNER JOIN dbo.Users u ON u.UserId = br.UserId
     INNER JOIN dbo.Inventory i ON i.InventoryId = br.InventoryId
@@ -178,7 +181,8 @@ BEGIN
         IF @@TRANCOUNT > 0
             ROLLBACK TRAN;
 
-        THROW;
+        DECLARE @ErrMsgBorrow NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrMsgBorrow, 16, 1);
     END CATCH;
 END;
 GO
@@ -212,7 +216,7 @@ BEGIN
           AND ReturnTime IS NULL;
 
         UPDATE dbo.Inventory
-        SET Status = 'PROCESSING',
+        SET Status = 'AVAILABLE',
             UpdatedAt = SYSUTCDATETIME()
         WHERE InventoryId = @InventoryId;
 
@@ -222,7 +226,8 @@ BEGIN
         IF @@TRANCOUNT > 0
             ROLLBACK TRAN;
 
-        THROW;
+        DECLARE @ErrMsgReturn NVARCHAR(4000) = ERROR_MESSAGE();
+        RAISERROR(@ErrMsgReturn, 16, 1);
     END CATCH;
 END;
 GO

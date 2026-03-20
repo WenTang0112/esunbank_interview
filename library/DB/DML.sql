@@ -26,8 +26,8 @@ VALUES
 ('9789864769155', 'AVAILABLE', N'D-01');
 GO
 
-/* Demo user: phone 0912345678, password hash/salt placeholders to be replaced by backend registration flow */
+/* Demo user: phone/password are both 0912345678 */
 INSERT INTO dbo.Users (PhoneNumber, PasswordHash, PasswordSalt, UserName)
 VALUES
-('0912345678', N'DEMO_HASH', N'DEMO_SALT', N'demo_user');
+('0912345678', N'QhVnfCS1TGwiknzHUN+1/j9MUR1FC0lob0miM75z/aQ=', N'ESUN_DEMO_SALT', N'demo_user');
 GO
