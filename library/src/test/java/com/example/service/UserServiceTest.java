@@ -8,6 +8,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,12 +23,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.example.dto.RegisterRequest;
 import com.example.dto.RegisterResponse;
 import com.example.repository.UserRepository;
+import com.example.security.AuthTokenUtil;
+import com.example.dto.LoginRequest;
+import com.example.dto.LoginResponse;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private AuthTokenUtil authTokenUtil;
 
     @InjectMocks
     private UserService userService;
@@ -44,6 +52,7 @@ class UserServiceTest {
     private ArgumentCaptor<String> userNameCaptor;
 
     private RegisterRequest validRequest;
+    private LoginRequest validLoginRequest;
 
     @BeforeEach
     void setUp() {
@@ -51,6 +60,10 @@ class UserServiceTest {
         validRequest.setPhoneNumber("0912345678");
         validRequest.setPassword("Password123");
         validRequest.setUserName("Alice");
+
+        validLoginRequest = new LoginRequest();
+        validLoginRequest.setPhoneNumber("0912345678");
+        validLoginRequest.setPassword("Password123");
     }
 
     @Test
@@ -113,5 +126,67 @@ class UserServiceTest {
         verify(userRepository).registerUser(phoneCaptor.capture(), hashCaptor.capture(), saltCaptor.capture(), userNameCaptor.capture());
         assertTrue(validRequest.getPassword().length() > 0);
         assertFalse(validRequest.getPassword().equals(hashCaptor.getValue()));
+    }
+
+    @Test
+    @DisplayName("登入成功：正確帳密可取得 Token 並更新最後登入時間")
+    void shouldLoginSuccessfully() {
+        // Given
+        String salt = "somesalt";
+        String hash = com.example.util.PasswordUtil.hashPassword("Password123", salt);
+        Map<String, Object> userRow = Map.of(
+            "UserId", 1,
+            "PhoneNumber", "0912345678",
+            "PasswordHash", hash,
+            "PasswordSalt", salt,
+            "IsActive", true
+        );
+        when(userRepository.findLoginUserByPhone("0912345678")).thenReturn(java.util.Optional.of(userRow));
+        when(authTokenUtil.generateToken(1, "0912345678")).thenReturn("token-abc");
+
+        // When
+        LoginResponse response = userService.login(validLoginRequest);
+
+        // Then
+        assertEquals(1, response.getUserId());
+        assertEquals("0912345678", response.getPhoneNumber());
+        assertEquals("token-abc", response.getToken());
+        assertEquals("Login success", response.getMessage());
+        verify(userRepository).updateLastLogin(1);
+    }
+
+    @Test
+    @DisplayName("登入失敗：密碼錯誤時應回傳未授權")
+    void shouldThrowWhenPasswordIncorrect() {
+        // Given
+        String salt = "somesalt";
+        String wrongHash = com.example.util.PasswordUtil.hashPassword("WrongPassword", salt);
+        Map<String, Object> userRow = Map.of(
+            "UserId", 1,
+            "PhoneNumber", "0912345678",
+            "PasswordHash", wrongHash,
+            "PasswordSalt", salt,
+            "IsActive", true
+        );
+        when(userRepository.findLoginUserByPhone("0912345678")).thenReturn(java.util.Optional.of(userRow));
+
+        // When
+        SecurityException ex = assertThrows(SecurityException.class, () -> userService.login(validLoginRequest));
+
+        // Then
+        assertEquals("Invalid phone number or password", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("登入失敗：手機不存在時應回傳未授權")
+    void shouldThrowWhenPhoneNotFound() {
+        // Given
+        when(userRepository.findLoginUserByPhone("0912345678")).thenReturn(java.util.Optional.empty());
+
+        // When
+        SecurityException ex = assertThrows(SecurityException.class, () -> userService.login(validLoginRequest));
+
+        // Then
+        assertEquals("Invalid phone number or password", ex.getMessage());
     }
 }
